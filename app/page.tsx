@@ -1,101 +1,135 @@
-import Image from "next/image";
+'use client'
 
-export default function Home() {
+import { useTrades } from '@/hooks/useTrades'
+import { useStats } from '@/hooks/useStats'
+import { useMarket } from '@/hooks/useMarket'
+import IndexBar from '@/components/market/IndexBar'
+import Link from 'next/link'
+import { BookOpen, BarChart2, TrendingUp, Search, ArrowUpRight } from 'lucide-react'
+
+export default function DashboardPage() {
+  const { trades, loading } = useTrades()
+  const { stats, positions } = useStats(trades)
+  const { indices, indicesLoading, refreshIndices } = useMarket()
+
+  const totalInvested = positions.reduce((s, p) => s + p.totalCost, 0)
+
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-8 row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="https://nextjs.org/icons/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-semibold">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li>Save and see your changes instantly.</li>
-        </ol>
+    <div className="flex flex-col min-h-screen">
+      <IndexBar indices={indices} loading={indicesLoading} onRefresh={refreshIndices} />
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="https://nextjs.org/icons/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:min-w-44"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+      <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">仪表盘</h1>
+          <p className="text-gray-500 text-sm mt-1">欢迎回来，以下是你的交易概览</p>
         </div>
-      </main>
-      <footer className="row-start-3 flex gap-6 flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="https://nextjs.org/icons/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+
+        {/* Key stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">已实现总盈亏</div>
+            <div className={`text-2xl font-bold ${stats.totalPnL >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {loading ? '—' : `$${stats.totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">交易笔数</div>
+            <div className="text-2xl font-bold text-gray-900">
+              {loading ? '—' : stats.totalTrades}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">胜率</div>
+            <div className={`text-2xl font-bold ${stats.winRate >= 50 ? 'text-red-600' : 'text-orange-600'}`}>
+              {loading ? '—' : `${stats.winRate.toFixed(1)}%`}
+            </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">当前持仓</div>
+            <div className="text-2xl font-bold text-blue-600">
+              {loading ? '—' : `$${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 0 })}`}
+            </div>
+            <div className="text-xs text-gray-400">{positions.length} 只股票</div>
+          </div>
+        </div>
+
+        {/* Open positions */}
+        {positions.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">当前持仓</h2>
+            </div>
+            <div className="space-y-2">
+              {positions.map((pos) => (
+                <div key={pos.symbol} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div>
+                    <span className="font-semibold text-gray-900">{pos.symbol}</span>
+                    {pos.name && <span className="text-sm text-gray-400 ml-2">{pos.name}</span>}
+                  </div>
+                  <div className="text-right text-sm">
+                    <div className="font-mono text-gray-700">{pos.quantity} 股 @ ${pos.avgCost.toFixed(2)}</div>
+                    <div className="text-gray-400">市值 ${pos.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Quick links */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { href: '/trades', icon: BookOpen, label: '记录交易', desc: '添加买卖记录', color: 'blue' },
+            { href: '/review', icon: BarChart2, label: '复盘分析', desc: '查看盈亏统计', color: 'purple' },
+            { href: '/market', icon: TrendingUp, label: '行情数据', desc: '查看K线报价', color: 'green' },
+            { href: '/scanner', icon: Search, label: '选股扫描', desc: '筛选热门股票', color: 'orange' },
+          ].map(({ href, icon: Icon, label, desc, color }) => (
+            <Link
+              key={href}
+              href={href}
+              className="bg-white rounded-xl border border-gray-200 p-5 hover:shadow-md transition-shadow group"
+            >
+              <div className={`w-10 h-10 rounded-lg bg-${color}-100 flex items-center justify-center mb-3`}>
+                <Icon className={`w-5 h-5 text-${color}-600`} />
+              </div>
+              <div className="font-semibold text-gray-900 flex items-center gap-1">
+                {label}
+                <ArrowUpRight className="w-4 h-4 text-gray-400 group-hover:text-gray-600 transition-colors" />
+              </div>
+              <div className="text-sm text-gray-400">{desc}</div>
+            </Link>
+          ))}
+        </div>
+
+        {/* Recent trades */}
+        {trades.length > 0 && (
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800">最近交易</h2>
+              <Link href="/trades" className="text-sm text-blue-600 hover:underline">查看全部 →</Link>
+            </div>
+            <div className="space-y-2">
+              {trades.slice(0, 5).map((trade) => (
+                <div key={trade.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${
+                      trade.direction === 'BUY' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'
+                    }`}>
+                      {trade.direction === 'BUY' ? '买' : '卖'}
+                    </span>
+                    <span className="font-semibold">{trade.symbol}</span>
+                    <span className="text-sm text-gray-400">{trade.quantity} 股</span>
+                  </div>
+                  <div className="text-right text-sm">
+                    <div className="font-mono">${trade.price.toFixed(2)}</div>
+                    <div className="text-gray-400">{String(trade.date).slice(0, 10)}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
-  );
+  )
 }
