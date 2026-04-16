@@ -97,6 +97,12 @@ export interface Quote {
   low: number
   volume: number
   timestamp?: number
+  // 盘前 / 盘后数据
+  extPrice?: number        // 盘前/盘后价格
+  extChange?: number       // 变动金额
+  extChangePercent?: number // 变动百分比
+  extType?: 'pre' | 'post' // 盘前还是盘后
+  extTime?: string         // 数据时间
 }
 
 // K-Line candle

@@ -1,7 +1,7 @@
 'use client'
 
 import { Quote } from '@/types'
-import { TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { TrendingUp, TrendingDown, Minus, Moon, Sunrise } from 'lucide-react'
 
 interface QuoteCardProps {
   quote: Quote
@@ -11,6 +11,11 @@ interface QuoteCardProps {
 export default function QuoteCard({ quote, onAddToWatchlist }: QuoteCardProps) {
   const isUp = quote.changePercent > 0
   const isFlat = quote.changePercent === 0
+
+  const hasExt = quote.extPrice !== undefined && quote.extPrice !== null
+  const extIsUp = (quote.extChangePercent ?? 0) > 0
+  const extLabel = quote.extType === 'pre' ? '盘前' : '盘后'
+  const ExtIcon = quote.extType === 'pre' ? Sunrise : Moon
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
@@ -33,6 +38,23 @@ export default function QuoteCard({ quote, onAddToWatchlist }: QuoteCardProps) {
           </div>
         </div>
       </div>
+
+      {/* 盘前/盘后 */}
+      {hasExt && (
+        <div className="flex items-center justify-between bg-gray-50 rounded-lg px-3 py-2.5 border border-gray-100">
+          <div className="flex items-center gap-1.5 text-xs text-gray-500">
+            <ExtIcon className="w-3.5 h-3.5" />
+            <span>{extLabel}</span>
+            {quote.extTime && <span className="text-gray-400">{quote.extTime}</span>}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-gray-900">${quote.extPrice!.toFixed(2)}</span>
+            <span className={`text-sm font-medium ${extIsUp ? 'text-red-600' : 'text-green-600'}`}>
+              {extIsUp ? '+' : ''}{quote.extChangePercent!.toFixed(2)}%
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* OHLV grid */}
       <div className="grid grid-cols-2 gap-3 text-sm">

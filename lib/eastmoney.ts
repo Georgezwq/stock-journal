@@ -48,6 +48,12 @@ export interface EastMoneyQuote {
   low: number
   volume: number
   marketCap?: number
+  // 盘前/盘后
+  extPrice?: number
+  extChange?: number
+  extChangePercent?: number
+  extType?: 'pre' | 'post'
+  extTime?: string
 }
 
 export interface EastMoneyKLine {
@@ -355,4 +361,83 @@ export async function fetchStockList(page = 1, pageSize = 50): Promise<{ symbol:
     // ignore
   }
   return []
+}
+
+// ──── Yahoo Finance 盘前/盘后数据 ────
+// 大盘指数的 Yahoo 代码映射
+const YAHOO_SYMBOL_MAP: Record<string, string> = {
+  'NDX': '^NDX',
+  'SPX': '^GSPC',
+  'DJI': '^DJI',
+}
+
+interface ExtendedQuote {
+  extPrice: number
+  extChange: number
+  extChangePercent: number
+  extType: 'pre' | 'post'
+  extTime: string
+}
+
+export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
+  const yahooSymbol = YAHOO_SYMBOL_MAP[symbol.toUpperCase()] || symbol.toUpperCase()
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1m&range=1d&includePrePost=true`
+
+  try {
+    const res = await robustFetch(url, 6000, 2)
+    const data = await res.json()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const meta = (data as any)?.chart?.result?.[0]?.meta
+    if (!meta) return null
+
+    const regularClose: number = meta.regularMarketPrice ?? meta.chartPreviousClose
+    const now = new Date()
+    const utcHour = now.getUTCHours()
+    const utcMin = now.getUTCMinutes()
+    const utcTotal = utcHour * 60 + utcMin
+    const day = now.getUTCDay()
+    const isWeekend = day === 0 || day === 6
+
+    // 美东时间 = UTC - 4（夏令时）
+    // 盘前: 美东 4:00-9:30 = UTC 8:00-13:30
+    // 盘中: 美东 9:30-16:00 = UTC 13:30-20:00
+    // 盘后: 美东 16:00-20:00 = UTC 20:00-24:00
+    const isPreMarket = !isWeekend && utcTotal >= 8 * 60 && utcTotal < 13 * 60 + 30
+    const isPostMarket = !isWeekend && utcTotal >= 20 * 60 && utcTotal < 24 * 60
+
+    let extPrice: number | undefined
+    let extType: 'pre' | 'post' | undefined
+
+    if (isPreMarket && meta.preMarketPrice) {
+      extPrice = meta.preMarketPrice
+      extType = 'pre'
+    } else if (isPostMarket && meta.postMarketPrice) {
+      extPrice = meta.postMarketPrice
+      extType = 'post'
+    } else if (meta.preMarketPrice && !isPostMarket) {
+      // 非交易时段，优先显示最近的盘前数据
+      extPrice = meta.preMarketPrice
+      extType = 'pre'
+    } else if (meta.postMarketPrice) {
+      extPrice = meta.postMarketPrice
+      extType = 'post'
+    }
+
+    if (!extPrice || !extType) return null
+
+    const extChange = parseFloat((extPrice - regularClose).toFixed(3))
+    const extChangePercent = parseFloat(((extChange / regularClose) * 100).toFixed(2))
+
+    // 格式化时间
+    const timeMs = extType === 'pre'
+      ? (meta.preMarketTime ?? 0) * 1000
+      : (meta.postMarketTime ?? 0) * 1000
+    const extTime = timeMs
+      ? new Date(timeMs).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })
+      : ''
+
+    return { extPrice, extChange, extChangePercent, extType, extTime }
+  } catch {
+    return null
+  }
 }

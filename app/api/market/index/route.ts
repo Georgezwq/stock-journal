@@ -1,13 +1,12 @@
 import { NextResponse } from 'next/server'
-import { fetchIndex } from '@/lib/eastmoney'
+import { fetchIndex, fetchExtendedQuote } from '@/lib/eastmoney'
 
 const INDICES = [
-  { id: '100.NDX', name: '纳斯达克100' },
-  { id: '100.SPX', name: '标普500' },
-  { id: '100.DJI', name: '道琼斯' },
+  { id: '100.NDX', symbol: 'NDX', name: '纳斯达克100' },
+  { id: '100.SPX', symbol: 'SPX', name: '标普500' },
+  { id: '100.DJI', symbol: 'DJI', name: '道琼斯' },
 ]
 
-// 总体超时：即使个别指数请求慢，也不阻塞超过 8 秒
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
   return Promise.race([
     promise,
@@ -18,8 +17,12 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | null> {
 export async function GET() {
   const results = await Promise.allSettled(
     INDICES.map(async (idx) => {
-      const data = await withTimeout(fetchIndex(idx.id), 8000)
-      if (data) return { ...data, name: idx.name, displayName: idx.name }
+      // 并发请求东方财富 + Yahoo盘前盘后
+      const [data, ext] = await Promise.all([
+        withTimeout(fetchIndex(idx.id), 8000),
+        withTimeout(fetchExtendedQuote(idx.symbol), 6000),
+      ])
+      if (data) return { ...data, name: idx.name, displayName: idx.name, ...(ext ?? {}) }
       return null
     })
   )
