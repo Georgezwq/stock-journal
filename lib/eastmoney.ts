@@ -381,60 +381,62 @@ interface ExtendedQuote {
 
 export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
   const yahooSymbol = YAHOO_SYMBOL_MAP[symbol.toUpperCase()] || symbol.toUpperCase()
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=1m&range=1d&includePrePost=true`
+  // 用 2m interval 获取包含盘前盘后的时间序列
+  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=2m&range=1d&includePrePost=true`
 
   try {
     const res = await robustFetch(url, 6000, 2)
     const data = await res.json()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const meta = (data as any)?.chart?.result?.[0]?.meta
-    if (!meta) return null
+    const result = (data as any)?.chart?.result?.[0]
+    if (!result) return null
+
+    const meta = result.meta
+    const timestamps: number[] = result.timestamp ?? []
+    const closes: number[] = result.indicators?.quote?.[0]?.close ?? []
+
+    if (timestamps.length === 0) return null
 
     const regularClose: number = meta.regularMarketPrice ?? meta.chartPreviousClose
     const now = new Date()
-    const utcHour = now.getUTCHours()
-    const utcMin = now.getUTCMinutes()
-    const utcTotal = utcHour * 60 + utcMin
+    const nowTs = Math.floor(now.getTime() / 1000)
     const day = now.getUTCDay()
     const isWeekend = day === 0 || day === 6
 
-    // 美东时间 = UTC - 4（夏令时）
-    // 盘前: 美东 4:00-9:30 = UTC 8:00-13:30
-    // 盘中: 美东 9:30-16:00 = UTC 13:30-20:00
-    // 盘后: 美东 16:00-20:00 = UTC 20:00-24:00
-    const isPreMarket = !isWeekend && utcTotal >= 8 * 60 && utcTotal < 13 * 60 + 30
-    const isPostMarket = !isWeekend && utcTotal >= 20 * 60 && utcTotal < 24 * 60
+    // 用 Yahoo 返回的交易时段边界判断当前状态（比手动算时区更准确）
+    const prePeriod = meta.currentTradingPeriod?.pre
+    const regularPeriod = meta.currentTradingPeriod?.regular
+    const postPeriod = meta.currentTradingPeriod?.post
 
-    let extPrice: number | undefined
     let extType: 'pre' | 'post' | undefined
-
-    if (isPreMarket && meta.preMarketPrice) {
-      extPrice = meta.preMarketPrice
+    if (!isWeekend && prePeriod && regularPeriod && nowTs >= prePeriod.start && nowTs < regularPeriod.start) {
       extType = 'pre'
-    } else if (isPostMarket && meta.postMarketPrice) {
-      extPrice = meta.postMarketPrice
+    } else if (!isWeekend && postPeriod && nowTs >= postPeriod.start && nowTs <= postPeriod.end) {
       extType = 'post'
-    } else if (meta.preMarketPrice && !isPostMarket) {
-      // 非交易时段，优先显示最近的盘前数据
-      extPrice = meta.preMarketPrice
-      extType = 'pre'
-    } else if (meta.postMarketPrice) {
-      extPrice = meta.postMarketPrice
-      extType = 'post'
+    } else {
+      return null // 盘中或非交易时段不显示
     }
 
-    if (!extPrice || !extType) return null
+    // 找出属于当前时段的最后一条有效价格
+    const periodStart = extType === 'pre' ? prePeriod!.start : postPeriod!.start
+    let extPrice: number | undefined
+    let extTs: number | undefined
+
+    for (let i = timestamps.length - 1; i >= 0; i--) {
+      if (timestamps[i] >= periodStart && closes[i] != null) {
+        extPrice = closes[i]
+        extTs = timestamps[i]
+        break
+      }
+    }
+
+    if (!extPrice || !extTs) return null
 
     const extChange = parseFloat((extPrice - regularClose).toFixed(3))
     const extChangePercent = parseFloat(((extChange / regularClose) * 100).toFixed(2))
-
-    // 格式化时间
-    const timeMs = extType === 'pre'
-      ? (meta.preMarketTime ?? 0) * 1000
-      : (meta.postMarketTime ?? 0) * 1000
-    const extTime = timeMs
-      ? new Date(timeMs).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York' })
-      : ''
+    const extTime = new Date(extTs * 1000).toLocaleTimeString('zh-CN', {
+      hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York'
+    })
 
     return { extPrice, extChange, extChangePercent, extType, extTime }
   } catch {
