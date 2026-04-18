@@ -57,8 +57,8 @@ function MiniKLine({ symbol }: { symbol: string }) {
           crosshair: { mode: lc.CrosshairMode.Normal },
           rightPriceScale: { borderColor: '#e5e7eb' },
           timeScale: { borderColor: '#e5e7eb', timeVisible: true },
-          handleScroll: true,
-          handleScale: true,
+          handleScroll: { mouseWheel: false, pressedMouseMove: true, horzTouchDrag: true, vertTouchDrag: false },
+          handleScale: { mouseWheel: false, pinch: true, axisPressedMouseMove: false },
         })
         chartRef.current = chart
 
@@ -98,9 +98,9 @@ function MiniKLine({ symbol }: { symbol: string }) {
   }, [symbol, period])
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3 pt-1 border-t border-gray-100">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-gray-400">K线图</span>
+        <span className="text-xs text-gray-500 font-medium">K线图</span>
         <div className="flex gap-1">
           {(['101', '102', '103'] as const).map(p => (
             <button
@@ -392,7 +392,7 @@ export default function WatchlistPage() {
           onClick={() => setModalQuote(null)}
         >
           <div
-            className="bg-white w-full md:w-[480px] rounded-t-2xl md:rounded-2xl p-5 space-y-4 max-h-[92vh] overflow-y-auto"
+            className="bg-white w-full md:w-[480px] rounded-t-2xl md:rounded-2xl p-6 space-y-5 max-h-[92vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             {/* 头部 */}
