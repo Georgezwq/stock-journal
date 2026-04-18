@@ -8,6 +8,7 @@ import {
   BarChart2,
   TrendingUp,
   Search,
+  Star,
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react'
@@ -18,6 +19,7 @@ const navItems = [
   { href: '/trades', label: '交易记录', icon: BookOpen },
   { href: '/review', label: '复盘分析', icon: BarChart2 },
   { href: '/market', label: '行情数据', icon: TrendingUp },
+  { href: '/watchlist', label: '自选股', icon: Star },
   { href: '/scanner', label: '选股扫描', icon: Search },
 ]
 
@@ -75,9 +77,9 @@ export default function Sidebar() {
         </button>
       </aside>
 
-      {/* 移动端底部导航栏 */}
+      {/* 移动端底部导航栏（只显示5个常用页） */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-gray-700 flex items-center">
-        {navItems.map(({ href, label, icon: Icon }) => {
+        {navItems.filter(i => i.href !== '/scanner').map(({ href, label, icon: Icon }) => {
           const active = pathname === href
           return (
             <Link
