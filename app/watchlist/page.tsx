@@ -18,6 +18,129 @@ interface WatchItem {
   addedAt: string
 }
 
+// ──── 弹窗内嵌迷你 K 线图 ────
+function MiniKLine({ symbol }: { symbol: string }) {
+  const containerRef = useRef<HTMLDivElement>(null)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chartRef = useRef<any>(null)
+  const [period, setPeriod] = useState<'101' | '102' | '103'>('101')
+  const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading')
+
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+
+    async function load() {
+      if (!containerRef.current) return
+      try {
+        const res = await fetch(`/api/market/kline?symbol=${symbol}&period=${period}&limit=90`)
+        if (cancelled) return
+        const candles = await res.json()
+        if (cancelled) return
+        if (!candles?.length) { setStatus('empty'); return }
+
+        const lc = await import('lightweight-charts')
+        if (cancelled) return
+
+        if (chartRef.current) {
+          try { chartRef.current.remove() } catch { /* ignore */ }
+          chartRef.current = null
+        }
+        if (!containerRef.current) return
+
+        const chart = lc.createChart(containerRef.current, {
+          width: containerRef.current.clientWidth,
+          height: 220,
+          layout: { background: { type: lc.ColorType.Solid, color: '#fff' }, textColor: '#6b7280' },
+          grid: { vertLines: { color: '#f3f4f6' }, horzLines: { color: '#f3f4f6' } },
+          crosshair: { mode: lc.CrosshairMode.Normal },
+          rightPriceScale: { borderColor: '#e5e7eb' },
+          timeScale: { borderColor: '#e5e7eb', timeVisible: false },
+          handleScroll: false,
+          handleScale: false,
+        })
+        chartRef.current = chart
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const CandlestickSeries = (lc as any).CandlestickSeries
+        const series = CandlestickSeries
+          ? chart.addSeries(CandlestickSeries, {
+              upColor: '#ef4444', downColor: '#22c55e',
+              borderUpColor: '#ef4444', borderDownColor: '#22c55e',
+              wickUpColor: '#ef4444', wickDownColor: '#22c55e',
+            })
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          : (chart as any).addCandlestickSeries({
+              upColor: '#ef4444', downColor: '#22c55e',
+              borderUpColor: '#ef4444', borderDownColor: '#22c55e',
+              wickUpColor: '#ef4444', wickDownColor: '#22c55e',
+            })
+
+        series.setData(candles.map((c: { time: string; open: number; high: number; low: number; close: number }) => ({
+          time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+        })))
+        chart.timeScale().fitContent()
+        setStatus('ok')
+
+        const observer = new ResizeObserver(() => {
+          if (containerRef.current && chartRef.current) {
+            chartRef.current.applyOptions({ width: containerRef.current.clientWidth })
+          }
+        })
+        observer.observe(containerRef.current)
+        return () => observer.disconnect()
+      } catch {
+        if (!cancelled) setStatus('empty')
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+      if (chartRef.current) {
+        try { chartRef.current.remove() } catch { /* ignore */ }
+        chartRef.current = null
+      }
+    }
+  }, [symbol, period])
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-xs text-gray-400">K线图</span>
+        <div className="flex gap-1">
+          {(['101', '102', '103'] as const).map(p => (
+            <button
+              key={p}
+              onClick={() => setPeriod(p)}
+              className={`px-2.5 py-0.5 rounded text-xs font-medium transition-colors ${
+                period === p ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+              }`}
+            >
+              {p === '101' ? '日K' : p === '102' ? '周K' : '月K'}
+            </button>
+          ))}
+        </div>
+      </div>
+      {status === 'loading' && (
+        <div className="h-[220px] flex items-center justify-center bg-gray-50 rounded-xl text-gray-400 text-sm">
+          加载中...
+        </div>
+      )}
+      {status === 'empty' && (
+        <div className="h-[220px] flex items-center justify-center bg-gray-50 rounded-xl text-gray-400 text-sm">
+          暂无K线数据
+        </div>
+      )}
+      <div
+        ref={containerRef}
+        className={`w-full rounded-xl overflow-hidden border border-gray-100 ${status !== 'ok' ? 'hidden' : ''}`}
+      />
+    </div>
+  )
+}
+
+// ──── 主页面 ────
 export default function WatchlistPage() {
   const { indices, indicesLoading, refreshIndices, fetchQuote } = useMarket()
   const [watchlist, setWatchlist] = useState<WatchItem[]>([])
@@ -25,15 +148,14 @@ export default function WatchlistPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
 
-  // 搜索状态
+  // 搜索
   const [searchText, setSearchText] = useState('')
   const [searching, setSearching] = useState(false)
-  const [searchResult, setSearchResult] = useState<Quote | null | 'notfound'>( null)
+  const [searchResult, setSearchResult] = useState<Quote | null | 'notfound'>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // 弹窗状态
+  // 弹窗
   const [modalQuote, setModalQuote] = useState<Quote | null>(null)
-  const [adding, setAdding] = useState(false)
 
   // 加载自选股列表
   const loadWatchlist = useCallback(async () => {
@@ -73,53 +195,62 @@ export default function WatchlistPage() {
     }, 500)
   }
 
-  // 点击搜索结果 → 打开弹窗
-  const handleResultClick = (q: Quote) => {
-    setModalQuote(q)
-  }
+  // 弹窗内确认添加 —— 乐观更新，后台静默持久化
+  const handleConfirmAdd = async (q: Quote) => {
+    const already = watchlist.some(w => w.symbol === q.symbol)
+    if (already) return
 
-  // 弹窗内确认添加
-  const handleConfirmAdd = async () => {
-    if (!modalQuote) return
-    setAdding(true)
+    // 1. 立即关闭弹窗、更新 UI（乐观）
+    const optimisticItem: WatchItem = {
+      id: `tmp-${q.symbol}`,
+      symbol: q.symbol,
+      name: q.name ?? null,
+      notes: null,
+      addedAt: new Date().toISOString(),
+    }
+    setWatchlist(prev => [optimisticItem, ...prev])
+    setQuotes(prev => ({ ...prev, [q.symbol]: q }))
+    setModalQuote(null)
+    setSearchText('')
+    setSearchResult(null)
+    toast.success(`${q.symbol} 已加入自选`)
+
+    // 2. 后台持久化（失败时撤回）
     try {
       const res = await fetch('/api/watchlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ symbol: modalQuote.symbol, name: modalQuote.name }),
+        body: JSON.stringify({ symbol: q.symbol, name: q.name }),
       })
-      if (res.ok) {
-        toast.success(`${modalQuote.symbol} 已加入自选`)
-        setModalQuote(null)
-        setSearchText('')
-        setSearchResult(null)
-        await loadWatchlist()
-      } else {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err?.error ?? '添加失败')
-      }
+      if (!res.ok) throw new Error('failed')
+      // 用真实 id 替换临时条目
+      const saved = await res.json()
+      setWatchlist(prev => prev.map(w => w.id === optimisticItem.id ? saved : w))
     } catch {
-      toast.error('添加失败，请重试')
-    } finally {
-      setAdding(false)
+      // 持久化失败，撤回
+      setWatchlist(prev => prev.filter(w => w.id !== optimisticItem.id))
+      setQuotes(prev => { const n = { ...prev }; delete n[q.symbol]; return n })
+      toast.error(`${q.symbol} 添加失败，请重试`)
     }
   }
 
   // 删除自选股
   const handleDelete = async (symbol: string) => {
+    // 乐观删除
+    const backup = watchlist.find(w => w.symbol === symbol)
+    setWatchlist(prev => prev.filter(w => w.symbol !== symbol))
+    setQuotes(prev => { const n = { ...prev }; delete n[symbol]; return n })
     try {
       await fetch(`/api/watchlist?symbol=${symbol}`, { method: 'DELETE' })
-      setWatchlist(prev => prev.filter(w => w.symbol !== symbol))
-      setQuotes(prev => { const n = { ...prev }; delete n[symbol]; return n })
       toast.success(`${symbol} 已移出自选`)
     } catch {
+      // 撤回
+      if (backup) setWatchlist(prev => [...prev, backup])
       toast.error('删除失败')
     }
   }
 
-  const alreadyAdded = modalQuote
-    ? watchlist.some(w => w.symbol === modalQuote.symbol)
-    : false
+  const alreadyAdded = modalQuote ? watchlist.some(w => w.symbol === modalQuote.symbol) : false
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -163,16 +294,16 @@ export default function WatchlistPage() {
             </button>
           )}
 
-          {/* 搜索结果下拉 */}
+          {/* 下拉结果 */}
           {searchText && (
             <div className="absolute top-full mt-1 left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg z-20 overflow-hidden">
               {searching ? (
                 <div className="px-4 py-3 text-sm text-gray-400">搜索中...</div>
               ) : searchResult === 'notfound' ? (
-                <div className="px-4 py-3 text-sm text-gray-400">未找到股票 "{searchText}"</div>
+                <div className="px-4 py-3 text-sm text-gray-400">未找到股票 &ldquo;{searchText}&rdquo;</div>
               ) : searchResult ? (
                 <button
-                  onClick={() => handleResultClick(searchResult)}
+                  onClick={() => setModalQuote(searchResult)}
                   className="w-full px-4 py-3 flex items-center justify-between hover:bg-gray-50 transition-colors text-left"
                 >
                   <div>
@@ -261,17 +392,17 @@ export default function WatchlistPage() {
         )}
       </div>
 
-      {/* 弹窗遮罩 */}
+      {/* 详情弹窗 */}
       {modalQuote && (
         <div
           className="fixed inset-0 bg-black/40 z-40 flex items-end md:items-center justify-center"
           onClick={() => setModalQuote(null)}
         >
           <div
-            className="bg-white w-full md:w-96 rounded-t-2xl md:rounded-2xl p-5 space-y-4"
+            className="bg-white w-full md:w-[480px] rounded-t-2xl md:rounded-2xl p-5 space-y-4 max-h-[92vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
-            {/* 弹窗标题 */}
+            {/* 头部 */}
             <div className="flex items-start justify-between">
               <div>
                 <div className="text-xl font-bold text-gray-900">{modalQuote.symbol}</div>
@@ -282,7 +413,7 @@ export default function WatchlistPage() {
               </button>
             </div>
 
-            {/* 价格区 */}
+            {/* 价格 */}
             <div className="flex items-end gap-3">
               <span className="text-3xl font-bold text-gray-900">${modalQuote.price.toFixed(2)}</span>
               <span className={`text-base font-medium mb-0.5 ${
@@ -323,15 +454,18 @@ export default function WatchlistPage() {
               ))}
             </div>
 
-            {/* 底部按钮 */}
+            {/* K线图 */}
+            <MiniKLine symbol={modalQuote.symbol} />
+
+            {/* 添加按钮 */}
             <div className="flex justify-end pt-1">
               <button
-                onClick={handleConfirmAdd}
-                disabled={adding || alreadyAdded}
+                onClick={() => handleConfirmAdd(modalQuote)}
+                disabled={alreadyAdded}
                 className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 <Plus className="w-4 h-4" />
-                {alreadyAdded ? '已在自选' : adding ? '添加中...' : '添加自选'}
+                {alreadyAdded ? '已在自选' : '添加自选'}
               </button>
             </div>
           </div>
