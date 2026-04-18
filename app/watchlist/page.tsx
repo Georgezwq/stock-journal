@@ -33,7 +33,8 @@ function MiniKLine({ symbol }: { symbol: string }) {
     async function load() {
       if (!containerRef.current) return
       try {
-        const res = await fetch(`/api/market/kline?symbol=${symbol}&period=${period}&limit=90`)
+        const limit = period === '101' ? 365 : period === '102' ? 104 : 60
+        const res = await fetch(`/api/market/kline?symbol=${symbol}&period=${period}&limit=${limit}`)
         if (cancelled) return
         const candles = await res.json()
         if (cancelled) return
@@ -49,15 +50,15 @@ function MiniKLine({ symbol }: { symbol: string }) {
         if (!containerRef.current) return
 
         const chart = lc.createChart(containerRef.current, {
-          width: containerRef.current.clientWidth,
-          height: 220,
+          autoSize: true,
+          height: 240,
           layout: { background: { type: lc.ColorType.Solid, color: '#fff' }, textColor: '#6b7280' },
           grid: { vertLines: { color: '#f3f4f6' }, horzLines: { color: '#f3f4f6' } },
           crosshair: { mode: lc.CrosshairMode.Normal },
           rightPriceScale: { borderColor: '#e5e7eb' },
-          timeScale: { borderColor: '#e5e7eb', timeVisible: false },
-          handleScroll: false,
-          handleScale: false,
+          timeScale: { borderColor: '#e5e7eb', timeVisible: true },
+          handleScroll: true,
+          handleScale: true,
         })
         chartRef.current = chart
 
@@ -81,14 +82,6 @@ function MiniKLine({ symbol }: { symbol: string }) {
         })))
         chart.timeScale().fitContent()
         setStatus('ok')
-
-        const observer = new ResizeObserver(() => {
-          if (containerRef.current && chartRef.current) {
-            chartRef.current.applyOptions({ width: containerRef.current.clientWidth })
-          }
-        })
-        observer.observe(containerRef.current)
-        return () => observer.disconnect()
       } catch {
         if (!cancelled) setStatus('empty')
       }
@@ -122,20 +115,20 @@ function MiniKLine({ symbol }: { symbol: string }) {
           ))}
         </div>
       </div>
-      {status === 'loading' && (
-        <div className="h-[220px] flex items-center justify-center bg-gray-50 rounded-xl text-gray-400 text-sm">
-          加载中...
-        </div>
-      )}
-      {status === 'empty' && (
-        <div className="h-[220px] flex items-center justify-center bg-gray-50 rounded-xl text-gray-400 text-sm">
-          暂无K线数据
-        </div>
-      )}
-      <div
-        ref={containerRef}
-        className={`w-full rounded-xl overflow-hidden border border-gray-100 ${status !== 'ok' ? 'hidden' : ''}`}
-      />
+      <div className="relative">
+        {/* 占位层：loading / empty 时显示，ok 时隐藏但保留空间 */}
+        {status !== 'ok' && (
+          <div className="absolute inset-0 flex items-center justify-center bg-gray-50 rounded-xl text-gray-400 text-sm z-10">
+            {status === 'loading' ? '加载中...' : '暂无K线数据'}
+          </div>
+        )}
+        {/* chart 容器始终在 DOM，保证 autoSize 能拿到真实宽度 */}
+        <div
+          ref={containerRef}
+          className="w-full rounded-xl overflow-hidden border border-gray-100"
+          style={{ height: 240 }}
+        />
+      </div>
     </div>
   )
 }
