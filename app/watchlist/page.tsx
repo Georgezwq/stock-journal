@@ -396,14 +396,24 @@ export default function WatchlistPage() {
             onClick={e => e.stopPropagation()}
           >
             {/* 头部 */}
-            <div className="flex items-start justify-between">
-              <div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
                 <div className="text-xl font-bold text-gray-900">{modalQuote.symbol}</div>
-                {modalQuote.name && <div className="text-sm text-gray-500 mt-0.5">{modalQuote.name}</div>}
+                {modalQuote.name && <div className="text-sm text-gray-500 truncate">{modalQuote.name}</div>}
               </div>
-              <button onClick={() => setModalQuote(null)} className="p-1 text-gray-400 hover:text-gray-600">
-                <X className="w-5 h-5" />
-              </button>
+              <div className="flex items-center gap-2 shrink-0">
+                <button
+                  onClick={() => handleConfirmAdd(modalQuote)}
+                  disabled={alreadyAdded}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                >
+                  <Plus className="w-4 h-4" />
+                  {alreadyAdded ? '已在自选' : '添加自选'}
+                </button>
+                <button onClick={() => setModalQuote(null)} className="p-1.5 text-gray-400 hover:text-gray-600">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
             </div>
 
             {/* 价格 */}
@@ -449,18 +459,6 @@ export default function WatchlistPage() {
 
             {/* K线图 */}
             <MiniKLine symbol={modalQuote.symbol} />
-
-            {/* 添加按钮 */}
-            <div className="flex justify-end pt-1">
-              <button
-                onClick={() => handleConfirmAdd(modalQuote)}
-                disabled={alreadyAdded}
-                className="flex items-center gap-1.5 px-5 py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                <Plus className="w-4 h-4" />
-                {alreadyAdded ? '已在自选' : '添加自选'}
-              </button>
-            </div>
           </div>
         </div>
       )}
