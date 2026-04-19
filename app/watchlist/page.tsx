@@ -150,6 +150,9 @@ export default function WatchlistPage() {
   // 弹窗
   const [modalQuote, setModalQuote] = useState<Quote | null>(null)
 
+  // 删除确认
+  const [deleteTarget, setDeleteTarget] = useState<WatchItem | null>(null)
+
   // 加载自选股列表
   const loadWatchlist = useCallback(async () => {
     try {
@@ -373,7 +376,7 @@ export default function WatchlistPage() {
                   </div>
 
                   <button
-                    onClick={() => handleDelete(item.symbol)}
+                    onClick={() => setDeleteTarget(item)}
                     className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors shrink-0"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -384,6 +387,46 @@ export default function WatchlistPage() {
           </div>
         )}
       </div>
+
+      {/* 删除确认弹窗 */}
+      {deleteTarget && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 flex items-end md:items-center justify-center"
+          onClick={() => setDeleteTarget(null)}
+        >
+          <div
+            className="bg-white w-full md:w-[360px] rounded-t-2xl md:rounded-2xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] space-y-4 mb-16 md:mb-0"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center shrink-0">
+                <Trash2 className="w-5 h-5 text-red-500" />
+              </div>
+              <div>
+                <div className="font-semibold text-gray-900">移出自选股</div>
+                <div className="text-sm text-gray-500 mt-0.5">
+                  确认将 <span className="font-bold text-gray-800">{deleteTarget.symbol}</span>
+                  {deleteTarget.name ? `（${deleteTarget.name}）` : ''} 移出自选？
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 pt-1">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                取消
+              </button>
+              <button
+                onClick={() => { handleDelete(deleteTarget.symbol); setDeleteTarget(null) }}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 text-white text-sm font-medium hover:bg-red-600 transition-colors"
+              >
+                确认移出
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 详情弹窗 */}
       {modalQuote && (

@@ -11,7 +11,7 @@ interface IndexBarProps {
 
 export default function IndexBar({ indices, loading, onRefresh }: IndexBarProps) {
   return (
-    <div className="bg-gray-900 text-white px-3 md:px-6 py-2 md:py-3 flex items-center gap-3 md:gap-6">
+    <div className="sticky top-0 z-10 bg-gray-900 text-white px-3 md:px-6 py-2 md:py-3 flex items-center gap-3 md:gap-6">
       <span className="text-xs text-gray-400 font-medium whitespace-nowrap hidden sm:inline">大盘指数</span>
 
       {loading && indices.length === 0 ? (
