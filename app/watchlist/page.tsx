@@ -174,7 +174,12 @@ export default function WatchlistPage() {
   }, [fetchQuote])
 
   useEffect(() => { loadWatchlist() }, [loadWatchlist])
-  useEffect(() => { if (watchlist.length > 0) refreshQuotes(watchlist) }, [watchlist, refreshQuotes])
+  useEffect(() => {
+    if (watchlist.length === 0) return
+    refreshQuotes(watchlist)
+    const timer = setInterval(() => refreshQuotes(watchlist), 15_000)
+    return () => clearInterval(timer)
+  }, [watchlist, refreshQuotes])
 
   // 搜索框输入 → 防抖查询
   const handleSearchChange = (val: string) => {
@@ -350,9 +355,10 @@ export default function WatchlistPage() {
                       )}
                     </div>
                     {hasExt && (
-                      <div className="text-xs text-gray-400 mt-0.5">
-                        {q.extType === 'pre' ? '盘前' : '盘后'} {q.extTime}
-                        <span className={`ml-1.5 font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                      <div className="text-xs text-gray-400 mt-0.5 flex items-center gap-1">
+                        {q.extType === 'pre' ? '盘前' : '盘后'}
+                        <span className="font-mono text-gray-600">${q.extPrice!.toFixed(2)}</span>
+                        <span className={`font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
                           {(q.extChangePercent ?? 0) >= 0 ? '+' : ''}{q.extChangePercent?.toFixed(2)}%
                         </span>
                       </div>

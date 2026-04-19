@@ -29,7 +29,7 @@ export function useMarket() {
 
   useEffect(() => {
     fetchIndices()
-    const interval = setInterval(fetchIndices, 60000) // 从 30s 改为 60s，减少请求压力
+    const interval = setInterval(fetchIndices, 15_000) // 15秒刷新
     return () => clearInterval(interval)
   }, [fetchIndices])
 
