@@ -30,7 +30,12 @@ export default function DashboardPage() {
     return () => clearInterval(timer)
   }, [positions, fetchQuote])
 
-  // 当前持仓市值：有实时价就用实时价，否则用成本
+  // 未实现总盈亏：有实时价的持仓加总
+  const totalUnrealizedPnL = positions.reduce((s, p) => {
+    const q = posQuotes[p.symbol]
+    return q ? s + (q.price - p.avgCost) * p.quantity : s
+  }, 0)
+  const hasUnrealized = Object.keys(posQuotes).length > 0 && positions.length > 0
   const totalMarketValue = positions.reduce((s, p) => {
     const q = posQuotes[p.symbol]
     return s + (q ? q.price * p.quantity : p.totalCost)
@@ -47,12 +52,23 @@ export default function DashboardPage() {
         </div>
 
         {/* Key stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="text-sm text-gray-500 mb-1">已实现总盈亏</div>
+            <div className="text-sm text-gray-500 mb-1">已实现盈亏</div>
             <div className={`text-2xl font-bold ${stats.totalPnL >= 0 ? 'text-red-600' : 'text-green-600'}`}>
               {loading ? '—' : `$${stats.totalPnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}`}
             </div>
+          </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5">
+            <div className="text-sm text-gray-500 mb-1">未实现盈亏</div>
+            <div className={`text-2xl font-bold ${!hasUnrealized ? 'text-gray-300' : totalUnrealizedPnL >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {loading ? '—' : hasUnrealized ? `${totalUnrealizedPnL >= 0 ? '+' : ''}$${totalUnrealizedPnL.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+            </div>
+            {hasUnrealized && positions.length > 0 && (
+              <div className="text-xs text-gray-400 mt-0.5">
+                浮动 {totalUnrealizedPnL >= 0 ? '+' : ''}{((totalUnrealizedPnL / positions.reduce((s, p) => s + p.totalCost, 0)) * 100).toFixed(2)}%
+              </div>
+            )}
           </div>
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="text-sm text-gray-500 mb-1">交易笔数</div>
