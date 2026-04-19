@@ -6,13 +6,35 @@ import { useMarket } from '@/hooks/useMarket'
 import IndexBar from '@/components/market/IndexBar'
 import Link from 'next/link'
 import { BookOpen, BarChart2, TrendingUp, Search, ArrowUpRight } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Quote } from '@/types'
 
 export default function DashboardPage() {
   const { trades, loading } = useTrades()
   const { stats, positions } = useStats(trades)
-  const { indices, indicesLoading, refreshIndices } = useMarket()
+  const { indices, indicesLoading, refreshIndices, fetchQuote } = useMarket()
 
-  const totalInvested = positions.reduce((s, p) => s + p.totalCost, 0)
+  // 持仓实时报价
+  const [posQuotes, setPosQuotes] = useState<Record<string, Quote>>({})
+
+  useEffect(() => {
+    if (positions.length === 0) return
+    const load = async () => {
+      const results = await Promise.all(positions.map(p => fetchQuote(p.symbol)))
+      const map: Record<string, Quote> = {}
+      results.forEach((q, i) => { if (q) map[positions[i].symbol] = q })
+      setPosQuotes(map)
+    }
+    load()
+    const timer = setInterval(load, 15_000)
+    return () => clearInterval(timer)
+  }, [positions, fetchQuote])
+
+  // 当前持仓市值：有实时价就用实时价，否则用成本
+  const totalMarketValue = positions.reduce((s, p) => {
+    const q = posQuotes[p.symbol]
+    return s + (q ? q.price * p.quantity : p.totalCost)
+  }, 0)
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -47,7 +69,7 @@ export default function DashboardPage() {
           <div className="bg-white rounded-xl border border-gray-200 p-5">
             <div className="text-sm text-gray-500 mb-1">当前持仓</div>
             <div className="text-2xl font-bold text-blue-600">
-              {loading ? '—' : `$${totalInvested.toLocaleString('en-US', { minimumFractionDigits: 0 })}`}
+              {loading ? '—' : `$${totalMarketValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}`}
             </div>
             <div className="text-xs text-gray-400">{positions.length} 只股票</div>
           </div>
@@ -60,18 +82,34 @@ export default function DashboardPage() {
               <h2 className="font-semibold text-gray-800">当前持仓</h2>
             </div>
             <div className="space-y-2">
-              {positions.map((pos) => (
-                <div key={pos.symbol} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                  <div>
-                    <span className="font-semibold text-gray-900">{pos.symbol}</span>
-                    {pos.name && <span className="text-sm text-gray-400 ml-2">{pos.name}</span>}
+              {positions.map((pos) => {
+                const q = posQuotes[pos.symbol]
+                const marketValue = q ? q.price * pos.quantity : pos.totalCost
+                const unrealizedPnL = q ? (q.price - pos.avgCost) * pos.quantity : null
+                const unrealizedPct = q ? ((q.price - pos.avgCost) / pos.avgCost) * 100 : null
+                const isUp = (unrealizedPnL ?? 0) >= 0
+                return (
+                  <div key={pos.symbol} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
+                    <div>
+                      <span className="font-semibold text-gray-900">{pos.symbol}</span>
+                      {pos.name && <span className="text-sm text-gray-400 ml-2">{pos.name}</span>}
+                      <div className="text-xs text-gray-400 mt-0.5">{pos.quantity} 股 @ ${pos.avgCost.toFixed(2)}</div>
+                    </div>
+                    <div className="text-right text-sm">
+                      <div className="font-mono font-semibold text-gray-800">
+                        {q ? `$${q.price.toFixed(2)}` : '—'}
+                        <span className="text-xs text-gray-400 ml-1">市值 ${marketValue.toLocaleString('en-US', { minimumFractionDigits: 0 })}</span>
+                      </div>
+                      {unrealizedPnL !== null && (
+                        <div className={`font-medium ${isUp ? 'text-red-500' : 'text-green-500'}`}>
+                          {isUp ? '+' : ''}${unrealizedPnL.toFixed(2)}
+                          <span className="ml-1 text-xs">({isUp ? '+' : ''}{unrealizedPct!.toFixed(2)}%)</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-right text-sm">
-                    <div className="font-mono text-gray-700">{pos.quantity} 股 @ ${pos.avgCost.toFixed(2)}</div>
-                    <div className="text-gray-400">市值 ${pos.totalCost.toLocaleString('en-US', { minimumFractionDigits: 2 })}</div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         )}
