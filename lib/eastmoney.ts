@@ -394,11 +394,11 @@ export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote 
     if (!match) return null
 
     const parts = match[1].split(',')
-    // [21]=盘前/盘后价, [22]=涨跌额, [23]=涨跌幅%, [24]=盘前/盘后时间(含AM/PM EDT)
+    // [21]=盘前/盘后价, [22]=涨跌幅%, [23]=涨跌额, [24]=盘前/盘后时间(含AM/PM EDT)
     // [25]=上次收盘时间, [26]=昨收价
     const extPriceRaw = parseFloat(parts[21])
-    const extChangeRaw = parseFloat(parts[22])
-    const extChangePctRaw = parseFloat(parts[23])
+    const extChangePctRaw = parseFloat(parts[22])
+    const extChangeRaw = parseFloat(parts[23])
     const extTimeRaw = parts[24] ?? ''  // e.g. "Apr 20 04:35AM EDT"
     const lastCloseTimeRaw = parts[25] ?? '' // e.g. "Apr 17 04:00PM EDT"
 
