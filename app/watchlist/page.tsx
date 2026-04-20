@@ -196,9 +196,11 @@ export default function WatchlistPage() {
     if (list.length === 0) return
     setRefreshing(true)
     const results = await Promise.all(list.map(item => fetchQuote(item.symbol)))
-    const map: Record<string, Quote> = {}
-    results.forEach((q, i) => { if (q) map[list[i].symbol] = q })
-    setQuotes(map)
+    setQuotes(prev => {
+      const next = { ...prev }
+      results.forEach((q, i) => { if (q) next[list[i].symbol] = q }) // 只更新成功的，失败保留旧数据
+      return next
+    })
     setRefreshing(false)
   }, [fetchQuote])
 
