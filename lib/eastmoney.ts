@@ -77,7 +77,7 @@ const HEADERS = {
  * 带超时 + 自动重试的 fetch
  * 超时 5s，最多重试 2 次（总计最坏 ~10s 而非之前的 ~36s）
  */
-async function robustFetch(url: string, timeout = 5000, maxRetries = 2): Promise<Response> {
+async function robustFetch(url: string, timeout = 5000, maxRetries = 2, customHeaders?: Record<string, string>): Promise<Response> {
   let lastError: Error | null = null
   for (let i = 0; i < maxRetries; i++) {
     const controller = new AbortController()
@@ -86,7 +86,7 @@ async function robustFetch(url: string, timeout = 5000, maxRetries = 2): Promise
       const res = await fetch(url, {
         signal: controller.signal,
         cache: 'no-store',
-        headers: HEADERS,
+        headers: customHeaders ?? HEADERS,
       })
       clearTimeout(timer)
       return res
@@ -363,12 +363,12 @@ export async function fetchStockList(page = 1, pageSize = 50): Promise<{ symbol:
   return []
 }
 
-// ──── Yahoo Finance 盘前/盘后数据 ────
-// 大盘指数的 Yahoo 代码映射
-const YAHOO_SYMBOL_MAP: Record<string, string> = {
-  'NDX': '^NDX',
-  'SPX': '^GSPC',
-  'DJI': '^DJI',
+// ──── 新浪财经 盘前/盘后数据 ────
+// 新浪美股代码：直接小写 symbol，大盘指数单独映射
+const SINA_INDEX_MAP: Record<string, string> = {
+  'NDX': 'ndx',
+  'SPX': 'inx',
+  'DJI': 'dji',
 }
 
 interface ExtendedQuote {
@@ -380,65 +380,49 @@ interface ExtendedQuote {
 }
 
 export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
-  const yahooSymbol = YAHOO_SYMBOL_MAP[symbol.toUpperCase()] || symbol.toUpperCase()
-  // 用 2m interval 获取包含盘前盘后的时间序列
-  const url = `https://query2.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(yahooSymbol)}?interval=2m&range=1d&includePrePost=true`
+  const upper = symbol.toUpperCase()
+  const sinaCode = SINA_INDEX_MAP[upper] ?? upper.toLowerCase()
+  const url = `https://hq.sinajs.cn/list=gb_${sinaCode}`
 
   try {
-    const res = await robustFetch(url, 6000, 2)
-    const data = await res.json()
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result = (data as any)?.chart?.result?.[0]
-    if (!result) return null
-
-    const meta = result.meta
-    const timestamps: number[] = result.timestamp ?? []
-    const closes: number[] = result.indicators?.quote?.[0]?.close ?? []
-
-    if (timestamps.length === 0) return null
-
-    const regularClose: number = meta.regularMarketPrice ?? meta.chartPreviousClose
-    const now = new Date()
-    const nowTs = Math.floor(now.getTime() / 1000)
-    const day = now.getUTCDay()
-    const isWeekend = day === 0 || day === 6
-
-    // 用 Yahoo 返回的交易时段边界判断当前状态（比手动算时区更准确）
-    const prePeriod = meta.currentTradingPeriod?.pre
-    const regularPeriod = meta.currentTradingPeriod?.regular
-    const postPeriod = meta.currentTradingPeriod?.post
-
-    let extType: 'pre' | 'post' | undefined
-    if (!isWeekend && prePeriod && regularPeriod && nowTs >= prePeriod.start && nowTs < regularPeriod.start) {
-      extType = 'pre'
-    } else if (!isWeekend && postPeriod && nowTs >= postPeriod.start && nowTs <= postPeriod.end) {
-      extType = 'post'
-    } else {
-      return null // 盘中或非交易时段不显示
-    }
-
-    // 找出属于当前时段的最后一条有效价格
-    const periodStart = extType === 'pre' ? prePeriod!.start : postPeriod!.start
-    let extPrice: number | undefined
-    let extTs: number | undefined
-
-    for (let i = timestamps.length - 1; i >= 0; i--) {
-      if (timestamps[i] >= periodStart && closes[i] != null) {
-        extPrice = closes[i]
-        extTs = timestamps[i]
-        break
-      }
-    }
-
-    if (!extPrice || !extTs) return null
-
-    const extChange = parseFloat((extPrice - regularClose).toFixed(3))
-    const extChangePercent = parseFloat(((extChange / regularClose) * 100).toFixed(2))
-    const extTime = new Date(extTs * 1000).toLocaleTimeString('zh-CN', {
-      hour: '2-digit', minute: '2-digit', timeZone: 'America/New_York'
+    const res = await robustFetch(url, 6000, 1, {
+      'Referer': 'https://finance.sina.com.cn',
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     })
+    const text = await res.text()
+    const match = text.match(/hq_str_gb_\w+="(.+)"/)
+    if (!match) return null
 
-    return { extPrice, extChange, extChangePercent, extType, extTime }
+    const parts = match[1].split(',')
+    // [21]=盘前/盘后价, [22]=涨跌额, [23]=涨跌幅%, [24]=盘前/盘后时间(含AM/PM EDT)
+    // [25]=上次收盘时间, [26]=昨收价
+    const extPriceRaw = parseFloat(parts[21])
+    const extChangeRaw = parseFloat(parts[22])
+    const extChangePctRaw = parseFloat(parts[23])
+    const extTimeRaw = parts[24] ?? ''  // e.g. "Apr 20 04:35AM EDT"
+    const lastCloseTimeRaw = parts[25] ?? '' // e.g. "Apr 17 04:00PM EDT"
+
+    if (!extPriceRaw || isNaN(extPriceRaw) || !extTimeRaw) return null
+
+    // 根据时间字段判断是盘前还是盘后
+    // 盘前时间含 AM（美东时间），盘后含 PM 且不是收盘时间
+    // 更可靠：对比盘前时间和收盘时间的日期是否是同一天
+    const isPreMarket = extTimeRaw.includes('AM')
+    const isPostMarket = extTimeRaw.includes('PM') && extTimeRaw !== lastCloseTimeRaw
+
+    if (!isPreMarket && !isPostMarket) return null
+
+    // 格式化时间：把 "Apr 20 04:35AM EDT" 简化为 "04:35"
+    const timeMatch = extTimeRaw.match(/(\d{2}:\d{2})(AM|PM)/)
+    const extTime = timeMatch ? `${timeMatch[1]}${timeMatch[2]}` : extTimeRaw
+
+    return {
+      extPrice: extPriceRaw,
+      extChange: isNaN(extChangeRaw) ? 0 : extChangeRaw,
+      extChangePercent: isNaN(extChangePctRaw) ? 0 : extChangePctRaw,
+      extType: isPreMarket ? 'pre' : 'post',
+      extTime,
+    }
   } catch {
     return null
   }
