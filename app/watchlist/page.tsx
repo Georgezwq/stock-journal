@@ -421,52 +421,52 @@ export default function WatchlistPage() {
               return (
                 <div
                   key={item.symbol}
-                  className="bg-white rounded-xl border border-gray-200 px-4 py-3"
+                  className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between"
                 >
-                  {/* 主行：股票名 + 价格 + 删除 */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2 min-w-0">
+                  {/* 左列：股票名 + 盘前数据 */}
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
                       <span className="font-bold text-gray-900">{item.symbol}</span>
                       {item.name && (
                         <span className="text-xs text-gray-400 truncate max-w-[80px] md:max-w-none">{item.name}</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-3 shrink-0 ml-3">
-                      {q ? (
-                        <div className="text-right">
-                          <div className="font-mono font-bold text-gray-900">${q.price.toFixed(2)}</div>
-                          <div className={`flex items-center justify-end gap-0.5 text-sm font-medium ${
-                            isUp ? 'text-red-600' : isFlat ? 'text-gray-400' : 'text-green-600'
-                          }`}>
-                            {isUp ? <TrendingUp className="w-3 h-3" /> : isFlat ? null : <TrendingDown className="w-3 h-3" />}
-                            {isUp ? '+' : ''}{q.changePercent.toFixed(2)}%
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-gray-300 text-sm">--</div>
-                      )}
-                      <button
-                        onClick={() => setDeleteTarget(item)}
-                        className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
+                    {hasExt && (
+                      <div className="mt-0.5 flex items-center gap-1.5 text-xs text-gray-400">
+                        <span>{q.extType === 'pre' ? '盘前' : '盘后'}</span>
+                        <span className="font-mono text-gray-600">${q.extPrice!.toFixed(2)}</span>
+                        <span className={`font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          {(q.extChangePercent ?? 0) >= 0 ? '+' : ''}{q.extChange?.toFixed(2)}
+                        </span>
+                        <span className={`font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
+                          ({(q.extChangePercent ?? 0) >= 0 ? '+' : ''}{q.extChangePercent?.toFixed(2)}%)
+                        </span>
+                      </div>
+                    )}
                   </div>
-                  {/* 盘前/盘后行：单独一行，不会被挤压 */}
-                  {hasExt && (
-                    <div className="mt-1 flex items-center gap-1.5 text-xs text-gray-400">
-                      <span>{q.extType === 'pre' ? '盘前' : '盘后'}</span>
-                      <span className="font-mono text-gray-600">${q.extPrice!.toFixed(2)}</span>
-                      <span className={`font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        {(q.extChangePercent ?? 0) >= 0 ? '+' : ''}{q.extChange?.toFixed(2)}
-                      </span>
-                      <span className={`font-medium ${(q.extChangePercent ?? 0) >= 0 ? 'text-red-500' : 'text-green-500'}`}>
-                        ({(q.extChangePercent ?? 0) >= 0 ? '+' : ''}{q.extChangePercent?.toFixed(2)}%)
-                      </span>
-                      <span className="text-gray-300">{q.extTime}</span>
-                    </div>
-                  )}
+
+                  {/* 右列：收盘价+涨跌幅 + 删除按钮，整体垂直居中 */}
+                  <div className="flex items-center gap-3 shrink-0 ml-3">
+                    {q ? (
+                      <div className="text-right">
+                        <div className="font-mono font-bold text-gray-900">${q.price.toFixed(2)}</div>
+                        <div className={`flex items-center justify-end gap-0.5 text-sm font-medium ${
+                          isUp ? 'text-red-600' : isFlat ? 'text-gray-400' : 'text-green-600'
+                        }`}>
+                          {isUp ? <TrendingUp className="w-3 h-3" /> : isFlat ? null : <TrendingDown className="w-3 h-3" />}
+                          {isUp ? '+' : ''}{q.changePercent.toFixed(2)}%
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-gray-300 text-sm">--</div>
+                    )}
+                    <button
+                      onClick={() => setDeleteTarget(item)}
+                      className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )
             })}
