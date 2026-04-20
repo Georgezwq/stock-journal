@@ -200,7 +200,22 @@ export default function WatchlistPage() {
       const res = await fetch(`/api/market/quotes?symbols=${symbols}`)
       if (!res.ok) return
       const data: Record<string, Quote> = await res.json()
-      setQuotes(prev => ({ ...prev, ...data })) // 合并，保留未返回的旧数据
+      setQuotes(prev => {
+        const next = { ...prev }
+        for (const [symbol, q] of Object.entries(data)) {
+          const old = prev[symbol]
+          // ext 字段缺失时保留旧值，防止 Vercel 冷启动实例缓存为空时丢失盘前数据
+          next[symbol] = {
+            ...q,
+            extPrice: q.extPrice ?? old?.extPrice,
+            extChange: q.extChange ?? old?.extChange,
+            extChangePercent: q.extChangePercent ?? old?.extChangePercent,
+            extType: q.extType ?? old?.extType,
+            extTime: q.extTime ?? old?.extTime,
+          }
+        }
+        return next
+      })
     } catch { /* ignore */ }
     finally { setRefreshing(false) }
   }, [])
