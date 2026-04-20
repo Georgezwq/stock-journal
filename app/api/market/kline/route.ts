@@ -9,7 +9,7 @@ const CACHE_TTL = 300_000 // 5 分钟缓存（K线历史数据不会频繁变化
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url)
   const symbol = searchParams.get('symbol')
-  const period = (searchParams.get('period') || '101') as '101' | '102' | '103'
+  const period = (searchParams.get('period') || '101') as '1' | '101' | '102' | '103'
   const limit = parseInt(searchParams.get('limit') || '365')
   const end = searchParams.get('end') || undefined
 
@@ -17,10 +17,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: '缺少 symbol 参数' }, { status: 400 })
   }
 
-  // 检查缓存
+  // 检查缓存（分时数据缓存 60 秒，日线以上 5 分钟）
+  const cacheTtl = period === '1' ? 60_000 : CACHE_TTL
   const cacheKey = `${symbol.toUpperCase()}-${period}-${limit}-${end || ''}`
   const cached = klineCache.get(cacheKey)
-  if (cached && Date.now() - cached.ts < CACHE_TTL && cached.data.length > 0) {
+  if (cached && Date.now() - cached.ts < cacheTtl && cached.data.length > 0) {
     return NextResponse.json(cached.data)
   }
 

@@ -23,7 +23,7 @@ function MiniKLine({ symbol }: { symbol: string }) {
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chartRef = useRef<any>(null)
-  const [period, setPeriod] = useState<'101' | '102' | '103'>('101')
+  const [period, setPeriod] = useState<'1' | '101' | '102' | '103'>('101')
   const [status, setStatus] = useState<'loading' | 'ok' | 'empty'>('loading')
 
   useEffect(() => {
@@ -33,7 +33,7 @@ function MiniKLine({ symbol }: { symbol: string }) {
     async function load() {
       if (!containerRef.current) return
       try {
-        const limit = period === '101' ? 365 : period === '102' ? 104 : 60
+        const limit = period === '1' ? 240 : period === '101' ? 365 : period === '102' ? 104 : 60
         const res = await fetch(`/api/market/kline?symbol=${symbol}&period=${period}&limit=${limit}`)
         if (cancelled) return
         const candles = await res.json()
@@ -62,24 +62,38 @@ function MiniKLine({ symbol }: { symbol: string }) {
         })
         chartRef.current = chart
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const CandlestickSeries = (lc as any).CandlestickSeries
-        const series = CandlestickSeries
-          ? chart.addSeries(CandlestickSeries, {
-              upColor: '#ef4444', downColor: '#22c55e',
-              borderUpColor: '#ef4444', borderDownColor: '#22c55e',
-              wickUpColor: '#ef4444', wickDownColor: '#22c55e',
-            })
+        if (period === '1') {
+          // 分时图用折线，时间格式为 "2024-04-18 09:31" → Unix timestamp
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          : (chart as any).addCandlestickSeries({
-              upColor: '#ef4444', downColor: '#22c55e',
-              borderUpColor: '#ef4444', borderDownColor: '#22c55e',
-              wickUpColor: '#ef4444', wickDownColor: '#22c55e',
-            })
-
-        series.setData(candles.map((c: { time: string; open: number; high: number; low: number; close: number }) => ({
-          time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
-        })))
+          const LineSeries = (lc as any).LineSeries
+          const series = LineSeries
+            ? chart.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 2 })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            : (chart as any).addLineSeries({ color: '#3b82f6', lineWidth: 2 })
+          series.setData(candles.map((c: { time: string; close: number }) => ({
+            time: Math.floor(new Date(c.time.replace(' ', 'T') + ':00-04:00').getTime() / 1000),
+            value: c.close,
+          })))
+        } else {
+          // K线图用蜡烛
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const CandlestickSeries = (lc as any).CandlestickSeries
+          const series = CandlestickSeries
+            ? chart.addSeries(CandlestickSeries, {
+                upColor: '#ef4444', downColor: '#22c55e',
+                borderUpColor: '#ef4444', borderDownColor: '#22c55e',
+                wickUpColor: '#ef4444', wickDownColor: '#22c55e',
+              })
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            : (chart as any).addCandlestickSeries({
+                upColor: '#ef4444', downColor: '#22c55e',
+                borderUpColor: '#ef4444', borderDownColor: '#22c55e',
+                wickUpColor: '#ef4444', wickDownColor: '#22c55e',
+              })
+          series.setData(candles.map((c: { time: string; open: number; high: number; low: number; close: number }) => ({
+            time: c.time, open: c.open, high: c.high, low: c.low, close: c.close,
+          })))
+        }
         chart.timeScale().fitContent()
         setStatus('ok')
       } catch {
@@ -102,7 +116,7 @@ function MiniKLine({ symbol }: { symbol: string }) {
       <div className="flex items-center justify-between">
         <span className="text-xs text-gray-500 font-medium">K线图</span>
         <div className="flex gap-1">
-          {(['101', '102', '103'] as const).map(p => (
+          {(['1', '101', '102', '103'] as const).map(p => (
             <button
               key={p}
               onClick={() => setPeriod(p)}
@@ -110,7 +124,7 @@ function MiniKLine({ symbol }: { symbol: string }) {
                 period === p ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
               }`}
             >
-              {p === '101' ? '日K' : p === '102' ? '周K' : '月K'}
+              {p === '1' ? '分时' : p === '101' ? '日K' : p === '102' ? '周K' : '月K'}
             </button>
           ))}
         </div>
@@ -421,7 +435,8 @@ export default function WatchlistPage() {
               return (
                 <div
                   key={item.symbol}
-                  className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between"
+                  onClick={() => q && setModalQuote(q)}
+                  className="bg-white rounded-xl border border-gray-200 px-4 py-3 flex items-center justify-between cursor-pointer hover:shadow-md transition-shadow active:bg-gray-50"
                 >
                   {/* 左列：股票名 + 盘前数据 */}
                   <div className="min-w-0 flex-1">
@@ -461,7 +476,7 @@ export default function WatchlistPage() {
                       <div className="text-gray-300 text-sm">--</div>
                     )}
                     <button
-                      onClick={() => setDeleteTarget(item)}
+                      onClick={(e) => { e.stopPropagation(); setDeleteTarget(item) }}
                       className="p-1.5 rounded-lg text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors"
                     >
                       <Trash2 className="w-4 h-4" />

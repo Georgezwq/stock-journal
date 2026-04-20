@@ -238,7 +238,7 @@ async function fetchKLineFromYahoo(
 // ──── fetchKLine ────
 export async function fetchKLine(
   symbol: string,
-  period: '101' | '102' | '103' = '101',
+  period: '1' | '101' | '102' | '103' = '101',
   limit = 365,
   endDate?: string
 ): Promise<EastMoneyKLine[]> {
@@ -276,6 +276,9 @@ export async function fetchKLine(
   }
 
   if (emResult.length > 0) return emResult
+
+  // 分时数据不回退 Yahoo（Yahoo 不支持分钟级别数据）
+  if (period === '1') return []
 
   // 东方财富无数据（非交易时间 kline 服务不可用），回退 Yahoo Finance
   console.log(`[KLine] 东方财富无数据，回退 Yahoo Finance: ${upperSymbol}`)
