@@ -364,7 +364,6 @@ export async function fetchStockList(page = 1, pageSize = 50): Promise<{ symbol:
 }
 
 // ──── 新浪财经 盘前/盘后数据 ────
-// 新浪美股代码：直接小写 symbol，大盘指数单独映射
 const SINA_INDEX_MAP: Record<string, string> = {
   'NDX': 'ndx',
   'SPX': 'inx',
@@ -379,51 +378,63 @@ interface ExtendedQuote {
   extTime: string
 }
 
-export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
-  const upper = symbol.toUpperCase()
-  const sinaCode = SINA_INDEX_MAP[upper] ?? upper.toLowerCase()
-  const url = `https://hq.sinajs.cn/list=gb_${sinaCode}`
+function parseSinaExt(parts: string[]): ExtendedQuote | null {
+  const extPriceRaw = parseFloat(parts[21])
+  const extChangePctRaw = parseFloat(parts[22])
+  const extChangeRaw = parseFloat(parts[23])
+  const extTimeRaw = parts[24] ?? ''
+  const lastCloseTimeRaw = parts[25] ?? ''
 
+  if (!extPriceRaw || isNaN(extPriceRaw) || !extTimeRaw) return null
+
+  const isPreMarket = extTimeRaw.includes('AM')
+  const isPostMarket = extTimeRaw.includes('PM') && extTimeRaw !== lastCloseTimeRaw
+  if (!isPreMarket && !isPostMarket) return null
+
+  const timeMatch = extTimeRaw.match(/(\d{2}:\d{2})(AM|PM)/)
+  const extTime = timeMatch ? `${timeMatch[1]}${timeMatch[2]}` : extTimeRaw
+
+  return {
+    extPrice: extPriceRaw,
+    extChange: isNaN(extChangeRaw) ? 0 : extChangeRaw,
+    extChangePercent: isNaN(extChangePctRaw) ? 0 : extChangePctRaw,
+    extType: isPreMarket ? 'pre' : 'post',
+    extTime,
+  }
+}
+
+// 批量拉取多个股票的盘前/盘后数据，一次请求减少限流风险
+export async function fetchExtendedQuotes(symbols: string[]): Promise<Record<string, ExtendedQuote>> {
+  if (symbols.length === 0) return {}
+  const sinaCodes = symbols.map(s => {
+    const upper = s.toUpperCase()
+    return `gb_${SINA_INDEX_MAP[upper] ?? upper.toLowerCase()}`
+  })
+  const url = `https://hq.sinajs.cn/list=${sinaCodes.join(',')}`
   try {
-    const res = await robustFetch(url, 6000, 1, {
+    const res = await robustFetch(url, 8000, 2, {
       'Referer': 'https://finance.sina.com.cn',
       'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
     })
     const text = await res.text()
-    const match = text.match(/hq_str_gb_\w+="(.+)"/)
-    if (!match) return null
-
-    const parts = match[1].split(',')
-    // [21]=盘前/盘后价, [22]=涨跌幅%, [23]=涨跌额, [24]=盘前/盘后时间(含AM/PM EDT)
-    // [25]=上次收盘时间, [26]=昨收价
-    const extPriceRaw = parseFloat(parts[21])
-    const extChangePctRaw = parseFloat(parts[22])
-    const extChangeRaw = parseFloat(parts[23])
-    const extTimeRaw = parts[24] ?? ''  // e.g. "Apr 20 04:35AM EDT"
-    const lastCloseTimeRaw = parts[25] ?? '' // e.g. "Apr 17 04:00PM EDT"
-
-    if (!extPriceRaw || isNaN(extPriceRaw) || !extTimeRaw) return null
-
-    // 根据时间字段判断是盘前还是盘后
-    // 盘前时间含 AM（美东时间），盘后含 PM 且不是收盘时间
-    // 更可靠：对比盘前时间和收盘时间的日期是否是同一天
-    const isPreMarket = extTimeRaw.includes('AM')
-    const isPostMarket = extTimeRaw.includes('PM') && extTimeRaw !== lastCloseTimeRaw
-
-    if (!isPreMarket && !isPostMarket) return null
-
-    // 格式化时间：把 "Apr 20 04:35AM EDT" 简化为 "04:35"
-    const timeMatch = extTimeRaw.match(/(\d{2}:\d{2})(AM|PM)/)
-    const extTime = timeMatch ? `${timeMatch[1]}${timeMatch[2]}` : extTimeRaw
-
-    return {
-      extPrice: extPriceRaw,
-      extChange: isNaN(extChangeRaw) ? 0 : extChangeRaw,
-      extChangePercent: isNaN(extChangePctRaw) ? 0 : extChangePctRaw,
-      extType: isPreMarket ? 'pre' : 'post',
-      extTime,
+    const result: Record<string, ExtendedQuote> = {}
+    const regex = /hq_str_gb_(\w+)="(.+)"/g
+    let m
+    while ((m = regex.exec(text)) !== null) {
+      const sinaCode = m[1].toUpperCase()
+      // 还原为原始 symbol（处理大盘指数映射）
+      const symbol = Object.entries(SINA_INDEX_MAP).find(([, v]) => v.toUpperCase() === sinaCode)?.[0] ?? sinaCode
+      const parts = m[2].split(',')
+      const ext = parseSinaExt(parts)
+      if (ext) result[symbol] = ext
     }
+    return result
   } catch {
-    return null
+    return {}
   }
+}
+
+export async function fetchExtendedQuote(symbol: string): Promise<ExtendedQuote | null> {
+  const result = await fetchExtendedQuotes([symbol])
+  return result[symbol.toUpperCase()] ?? null
 }

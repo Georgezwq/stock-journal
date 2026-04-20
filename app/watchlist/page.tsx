@@ -191,18 +191,19 @@ export default function WatchlistPage() {
     finally { setLoading(false) }
   }, [])
 
-  // 拉取所有自选股实时报价
+  // 拉取所有自选股实时报价（批量接口，一次请求）
   const refreshQuotes = useCallback(async (list: WatchItem[]) => {
     if (list.length === 0) return
     setRefreshing(true)
-    const results = await Promise.all(list.map(item => fetchQuote(item.symbol)))
-    setQuotes(prev => {
-      const next = { ...prev }
-      results.forEach((q, i) => { if (q) next[list[i].symbol] = q }) // 只更新成功的，失败保留旧数据
-      return next
-    })
-    setRefreshing(false)
-  }, [fetchQuote])
+    try {
+      const symbols = list.map(i => i.symbol).join(',')
+      const res = await fetch(`/api/market/quotes?symbols=${symbols}`)
+      if (!res.ok) return
+      const data: Record<string, Quote> = await res.json()
+      setQuotes(prev => ({ ...prev, ...data })) // 合并，保留未返回的旧数据
+    } catch { /* ignore */ }
+    finally { setRefreshing(false) }
+  }, [])
 
   useEffect(() => { loadWatchlist() }, [loadWatchlist])
   useEffect(() => {
