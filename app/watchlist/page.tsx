@@ -301,7 +301,7 @@ export default function WatchlistPage() {
   const alreadyAdded = modalQuote ? watchlist.some(w => w.symbol === modalQuote.symbol) : false
 
   return (
-    <div className="flex flex-col min-h-screen">
+    <div className="flex flex-col flex-1">
       <IndexBar indices={indices} loading={indicesLoading} onRefresh={refreshIndices} />
 
       <div className="flex-1 p-4 md:p-6 space-y-4 md:space-y-5">

@@ -18,7 +18,7 @@ export default function RootLayout({
       <body className="antialiased bg-gray-50">
         <div className="flex h-screen overflow-hidden">
           <Sidebar />
-          <main className="flex-1 overflow-y-auto pb-16 md:pb-0">
+          <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
             {children}
           </main>
         </div>
