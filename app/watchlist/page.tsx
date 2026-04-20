@@ -6,7 +6,7 @@ import IndexBar from '@/components/market/IndexBar'
 import { useMarket } from '@/hooks/useMarket'
 import {
   Star, Trash2, RefreshCw, TrendingUp, TrendingDown,
-  Search, X, Plus, Moon, Sunrise,
+  Search, X, Plus, Moon, Sunrise, ArrowUpDown, ArrowUp, ArrowDown,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -153,6 +153,35 @@ export default function WatchlistPage() {
   // 删除确认
   const [deleteTarget, setDeleteTarget] = useState<WatchItem | null>(null)
 
+  // 排序：key=排序字段，dir=方向
+  type SortKey = 'default' | 'price' | 'change'
+  const [sortKey, setSortKey] = useState<SortKey>('default')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc')
+
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortDir(d => d === 'desc' ? 'asc' : 'desc')
+    } else {
+      setSortKey(key)
+      setSortDir('desc')
+    }
+  }
+
+  // 排序后的列表
+  const sortedWatchlist = [...watchlist].sort((a, b) => {
+    if (sortKey === 'default') return 0
+    const qa = quotes[a.symbol]
+    const qb = quotes[b.symbol]
+    // 有盘前/盘后就用盘前/盘后，否则用盘中
+    const valA = sortKey === 'price'
+      ? (qa?.extPrice ?? qa?.price ?? 0)
+      : (qa?.extChangePercent ?? qa?.changePercent ?? 0)
+    const valB = sortKey === 'price'
+      ? (qb?.extPrice ?? qb?.price ?? 0)
+      : (qb?.extChangePercent ?? qb?.changePercent ?? 0)
+    return sortDir === 'desc' ? valB - valA : valA - valB
+  })
+
   // 加载自选股列表
   const loadWatchlist = useCallback(async () => {
     try {
@@ -267,13 +296,32 @@ export default function WatchlistPage() {
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">共 {watchlist.length} 只</p>
           </div>
-          <button
-            onClick={() => refreshQuotes(watchlist)}
-            disabled={refreshing}
-            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          </button>
+          <div className="flex items-center gap-1">
+            {/* 排序按钮 */}
+            {(['price', 'change'] as const).map(key => {
+              const active = sortKey === key
+              const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown
+              return (
+                <button
+                  key={key}
+                  onClick={() => handleSort(key)}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                    active ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-100'
+                  }`}
+                >
+                  <Icon className="w-3 h-3" />
+                  {key === 'price' ? '价格' : '涨跌幅'}
+                </button>
+              )
+            })}
+            <button
+              onClick={() => refreshQuotes(watchlist)}
+              disabled={refreshing}
+              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            </button>
+          </div>
         </div>
 
         {/* 搜索框 */}
@@ -336,7 +384,7 @@ export default function WatchlistPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {watchlist.map(item => {
+            {sortedWatchlist.map(item => {
               const q = quotes[item.symbol]
               const isUp = (q?.changePercent ?? 0) > 0
               const isFlat = (q?.changePercent ?? 0) === 0
