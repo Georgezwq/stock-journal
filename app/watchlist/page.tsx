@@ -296,32 +296,13 @@ export default function WatchlistPage() {
             </h1>
             <p className="text-sm text-gray-500 mt-0.5">共 {watchlist.length} 只</p>
           </div>
-          <div className="flex items-center gap-1">
-            {/* 排序按钮 */}
-            {(['price', 'change'] as const).map(key => {
-              const active = sortKey === key
-              const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown
-              return (
-                <button
-                  key={key}
-                  onClick={() => handleSort(key)}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                    active ? 'bg-blue-50 text-blue-600' : 'text-gray-400 hover:bg-gray-100'
-                  }`}
-                >
-                  <Icon className="w-3 h-3" />
-                  {key === 'price' ? '价格' : '涨跌幅'}
-                </button>
-              )
-            })}
-            <button
-              onClick={() => refreshQuotes(watchlist)}
-              disabled={refreshing}
-              className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
-            >
-              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
+          <button
+            onClick={() => refreshQuotes(watchlist)}
+            disabled={refreshing}
+            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
 
         {/* 搜索框 */}
@@ -370,6 +351,35 @@ export default function WatchlistPage() {
                 </button>
               ) : null}
             </div>
+          )}
+        </div>
+
+        {/* 排序栏 */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-gray-400">排序：</span>
+          {(['price', 'change'] as const).map(key => {
+            const active = sortKey === key
+            const Icon = active ? (sortDir === 'desc' ? ArrowDown : ArrowUp) : ArrowUpDown
+            return (
+              <button
+                key={key}
+                onClick={() => handleSort(key)}
+                className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  active ? 'bg-blue-50 text-blue-600' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                <Icon className="w-3 h-3" />
+                {key === 'price' ? '价格' : '涨跌幅'}
+              </button>
+            )
+          })}
+          {sortKey !== 'default' && (
+            <button
+              onClick={() => setSortKey('default')}
+              className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5"
+            >
+              重置
+            </button>
           )}
         </div>
 
