@@ -11,8 +11,12 @@ import {
   Star,
   ChevronLeft,
   ChevronRight,
+  MessageCircle,
+  LogOut,
+  LogIn,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useSession, signOut } from 'next-auth/react'
 
 const navItems = [
   { href: '/', label: '仪表盘', icon: LayoutDashboard },
@@ -21,11 +25,13 @@ const navItems = [
   { href: '/market', label: '行情数据', icon: TrendingUp },
   { href: '/watchlist', label: '自选股', icon: Star },
   { href: '/scanner', label: '选股扫描', icon: Search },
+  { href: '/chat', label: '聊天室', icon: MessageCircle },
 ]
 
 export default function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const { data: session } = useSession()
 
   return (
     <>
@@ -64,6 +70,35 @@ export default function Sidebar() {
           })}
         </nav>
 
+        {/* 用户区 */}
+        <div className="border-t border-gray-700 p-3">
+          {session ? (
+            <div className={`flex items-center gap-2 ${collapsed ? 'justify-center' : ''}`}>
+              <span className="text-xl shrink-0">{(session.user as { avatar?: string })?.avatar || '😊'}</span>
+              {!collapsed && (
+                <>
+                  <span className="text-sm text-gray-300 truncate flex-1">{session.user?.name}</span>
+                  <button
+                    onClick={() => signOut({ callbackUrl: '/login' })}
+                    className="p-1.5 text-gray-500 hover:text-white transition-colors shrink-0"
+                    title="退出登录"
+                  >
+                    <LogOut className="w-4 h-4" />
+                  </button>
+                </>
+              )}
+            </div>
+          ) : (
+            <Link
+              href="/login"
+              className={`flex items-center gap-2 px-2 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-800 transition-colors ${collapsed ? 'justify-center' : ''}`}
+            >
+              <LogIn className="w-5 h-5 shrink-0" />
+              {!collapsed && <span className="text-sm">登录</span>}
+            </Link>
+          )}
+        </div>
+
         {/* Collapse toggle */}
         <button
           onClick={() => setCollapsed((v) => !v)}
@@ -77,7 +112,7 @@ export default function Sidebar() {
         </button>
       </aside>
 
-      {/* 移动端底部导航栏（只显示5个常用页） */}
+      {/* 移动端底部导航栏 */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 z-50 bg-gray-900 border-t border-gray-700 flex items-center">
         {navItems.filter(i => i.href !== '/scanner').map(({ href, label, icon: Icon }) => {
           const active = pathname === href

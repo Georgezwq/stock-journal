@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import Sidebar from "@/components/layout/Sidebar";
 import { Toaster } from "react-hot-toast";
+import Providers from "@/components/Providers";
 
 export const metadata: Metadata = {
   title: "美股交易复盘系统",
@@ -16,13 +17,15 @@ export default function RootLayout({
   return (
     <html lang="zh-CN">
       <body className="antialiased bg-gray-50">
-        <div className="flex h-screen overflow-hidden">
-          <Sidebar />
-          <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
-            {children}
-          </main>
-        </div>
-        <Toaster position="top-right" />
+        <Providers>
+          <div className="flex h-screen overflow-hidden">
+            <Sidebar />
+            <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+              {children}
+            </main>
+          </div>
+          <Toaster position="top-right" />
+        </Providers>
       </body>
     </html>
   );

@@ -34,3 +34,46 @@ model Watchlist {
   notes   String?
   addedAt DateTime @default(now())
 }
+
+// ──── 聊天功能 ────
+
+model User {
+  id           String       @id @default(cuid())
+  email        String       @unique
+  password     String       // bcrypt hash
+  nickname     String
+  avatar       String?      // emoji or url
+  createdAt    DateTime     @default(now())
+  messages     Message[]
+  memberships  RoomMember[]
+}
+
+model Room {
+  id          String       @id @default(cuid())
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  messages    Message[]
+  members     RoomMember[]
+}
+
+model RoomMember {
+  id       String   @id @default(cuid())
+  room     Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId   String
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId   String
+  joinedAt DateTime @default(now())
+
+  @@unique([roomId, userId])
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  room      Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  roomId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId    String
+  content   String
+  createdAt DateTime @default(now())
+}
