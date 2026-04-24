@@ -96,8 +96,9 @@ export default function ChatPage() {
     userCh.subscribe('friend-request', () => loadFriends())
 
     return () => {
-      try { userCh.unsubscribe(); userCh.detach() } catch { /* ignore */ }
-      try { ably.close() } catch { /* ignore */ }
+      try { userCh.unsubscribe() } catch { /* ignore */ }
+      userCh.detach().catch(() => { /* ignore */ })
+      setTimeout(() => { try { ably.close() } catch { /* ignore */ } }, 100)
       ablyRef.current = null
     }
   }, [session])
@@ -124,7 +125,8 @@ export default function ChatPage() {
   useEffect(() => {
     if (view.type !== 'room') return
     if (channelRef.current) {
-      try { channelRef.current.unsubscribe(); channelRef.current.detach() } catch { /* ignore */ }
+      try { channelRef.current.unsubscribe() } catch { /* ignore */ }
+      channelRef.current.detach().catch(() => { /* ignore */ })
     }
 
     fetch(`/api/chat/rooms/${view.room.id}/messages`).then(r => r.json()).then(setRoomMessages)
@@ -136,14 +138,18 @@ export default function ChatPage() {
       const m = msg.data as RoomMessage
       setRoomMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m])
     })
-    return () => { try { ch.unsubscribe() } catch { /* ignore */ } }
+    return () => {
+      try { ch.unsubscribe() } catch { /* ignore */ }
+      ch.detach().catch(() => { /* ignore */ })
+    }
   }, [view])
 
   /* 切换私信 */
   useEffect(() => {
     if (view.type !== 'dm') return
     if (channelRef.current) {
-      try { channelRef.current.unsubscribe(); channelRef.current.detach() } catch { /* ignore */ }
+      try { channelRef.current.unsubscribe() } catch { /* ignore */ }
+      channelRef.current.detach().catch(() => { /* ignore */ })
     }
 
     fetch(`/api/dm/${view.friend.id}`).then(r => r.json()).then(setDmMessages)
@@ -156,7 +162,10 @@ export default function ChatPage() {
       const m = msg.data as DM
       setDmMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m])
     })
-    return () => { try { ch.unsubscribe() } catch { /* ignore */ } }
+    return () => {
+      try { ch.unsubscribe() } catch { /* ignore */ }
+      ch.detach().catch(() => { /* ignore */ })
+    }
   }, [view, session])
 
   /* 自动滚到底部 */
