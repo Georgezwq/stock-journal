@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export const viewport = {
   width: 'device-width',
   initialScale: 1,
-  viewportFit: 'cover', // iOS 安全区支持
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({
@@ -24,12 +24,14 @@ export default function RootLayout({
     <html lang="zh-CN">
       <body className="antialiased bg-gray-50">
         <Providers>
-          <div className="flex h-screen overflow-hidden">
+          <div className="flex h-[100dvh] overflow-hidden">
             <Sidebar />
-            <main className="flex-1 min-h-0 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
-              <div className="flex flex-col h-full">
-                {children}
-              </div>
+            <main
+              id="main-scroll"
+              className="flex-1 min-h-0 overflow-y-auto pb-16 md:pb-0"
+              style={{ WebkitOverflowScrolling: 'touch' }}
+            >
+              {children}
             </main>
           </div>
           <Toaster position="top-right" />

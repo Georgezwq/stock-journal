@@ -40,12 +40,18 @@ model Watchlist {
 model User {
   id           String       @id @default(cuid())
   email        String       @unique
-  password     String       // bcrypt hash
+  password     String
   nickname     String
-  avatar       String?      // emoji or url
+  avatar       String?
   createdAt    DateTime     @default(now())
   messages     Message[]
   memberships  RoomMember[]
+  // 好友
+  sentRequests     Friendship[]    @relation("FriendRequester")
+  receivedRequests Friendship[]    @relation("FriendReceiver")
+  // 私信
+  sentDMs          DirectMessage[] @relation("DMSender")
+  receivedDMs      DirectMessage[] @relation("DMReceiver")
 }
 
 model Room {
@@ -76,4 +82,33 @@ model Message {
   userId    String
   content   String
   createdAt DateTime @default(now())
+}
+
+// 好友关系
+model Friendship {
+  id         String           @id @default(cuid())
+  requester  User             @relation("FriendRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  requesterId String
+  receiver   User             @relation("FriendReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId String
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now())
+
+  @@unique([requesterId, receiverId])
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+}
+
+// 私信
+model DirectMessage {
+  id         String   @id @default(cuid())
+  sender     User     @relation("DMSender", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId   String
+  receiver   User     @relation("DMReceiver", fields: [receiverId], references: [id], onDelete: Cascade)
+  receiverId String
+  content    String
+  createdAt  DateTime @default(now())
 }
