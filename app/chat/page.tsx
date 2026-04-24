@@ -61,6 +61,8 @@ export default function ChatPage() {
   const [searchQ, setSearchQ] = useState('')
   const [searchResults, setSearchResults] = useState<UserResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [sendingReq, setSendingReq] = useState<string | null>(null) // 正在发送请求的 userId
+  const [sentReqs, setSentReqs] = useState<Set<string>>(new Set()) // 已发送请求的 userId
 
   /* 公共 */
   const [input, setInput] = useState('')
@@ -201,11 +203,23 @@ export default function ChatPage() {
 
   /* 发送好友请求 */
   const sendFriendRequest = async (receiverId: string) => {
-    await fetch('/api/friends', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ receiverId }),
-    })
-    setShowAddFriend(false); setSearchQ('')
+    setSendingReq(receiverId)
+    try {
+      const res = await fetch('/api/friends', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ receiverId }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setSentReqs(prev => new Set([...Array.from(prev), receiverId]))
+      } else {
+        alert(data.error || '发送失败，请重试')
+      }
+    } catch {
+      alert('网络错误，请重试')
+    } finally {
+      setSendingReq(null)
+    }
   }
 
   /* 接受好友请求 */
@@ -493,6 +507,8 @@ export default function ChatPage() {
               {searchResults.map(u => {
                 const isFriend = friends.some(f => f.id === u.id)
                 const hasPending = pending.some(p => p.requester.id === u.id)
+                const hasSent = sentReqs.has(u.id)
+                const isSending = sendingReq === u.id
                 return (
                   <div key={u.id} className="flex items-center gap-3 py-2">
                     <div className="text-2xl">{u.avatar || '😊'}</div>
@@ -504,11 +520,15 @@ export default function ChatPage() {
                       <span className="text-xs text-green-600 font-medium">已是好友</span>
                     ) : hasPending ? (
                       <span className="text-xs text-yellow-600 font-medium">待验证</span>
+                    ) : hasSent ? (
+                      <span className="text-xs text-blue-500 font-medium">✓ 已发送</span>
                     ) : (
-                      <button onClick={() => sendFriendRequest(u.id)}
-                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 transition-colors"
+                      <button
+                        onClick={() => sendFriendRequest(u.id)}
+                        disabled={isSending}
+                        className="px-3 py-1 bg-blue-600 text-white text-xs rounded-lg hover:bg-blue-700 disabled:opacity-50 transition-colors"
                       >
-                        添加
+                        {isSending ? '发送中...' : '添加'}
                       </button>
                     )}
                   </div>
