@@ -80,14 +80,26 @@ export default function ChatPage() {
   /* 初始化 Ably */
   useEffect(() => {
     if (!session) return
-    const ably = new Ably.Realtime({ authUrl: '/api/chat/token', authMethod: 'GET' })
+    const ably = new Ably.Realtime({
+      authUrl: '/api/chat/token',
+      authMethod: 'GET',
+      disconnectedRetryTimeout: 5000,
+      suspendedRetryTimeout: 10000,
+    })
     ablyRef.current = ably
+
+    // 忽略连接关闭时的非致命错误
+    ably.connection.on('failed', () => { /* ignore */ })
 
     // 监听好友请求通知
     const userCh = ably.channels.get(`user:${session.user.id}`)
     userCh.subscribe('friend-request', () => loadFriends())
 
-    return () => { ably.close() }
+    return () => {
+      try { userCh.unsubscribe(); userCh.detach() } catch { /* ignore */ }
+      try { ably.close() } catch { /* ignore */ }
+      ablyRef.current = null
+    }
   }, [session])
 
   /* 加载房间 */
@@ -111,7 +123,9 @@ export default function ChatPage() {
   /* 切换聊天室 */
   useEffect(() => {
     if (view.type !== 'room') return
-    if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current.detach() }
+    if (channelRef.current) {
+      try { channelRef.current.unsubscribe(); channelRef.current.detach() } catch { /* ignore */ }
+    }
 
     fetch(`/api/chat/rooms/${view.room.id}/messages`).then(r => r.json()).then(setRoomMessages)
 
@@ -122,13 +136,15 @@ export default function ChatPage() {
       const m = msg.data as RoomMessage
       setRoomMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m])
     })
-    return () => { ch.unsubscribe() }
+    return () => { try { ch.unsubscribe() } catch { /* ignore */ } }
   }, [view])
 
   /* 切换私信 */
   useEffect(() => {
     if (view.type !== 'dm') return
-    if (channelRef.current) { channelRef.current.unsubscribe(); channelRef.current.detach() }
+    if (channelRef.current) {
+      try { channelRef.current.unsubscribe(); channelRef.current.detach() } catch { /* ignore */ }
+    }
 
     fetch(`/api/dm/${view.friend.id}`).then(r => r.json()).then(setDmMessages)
 
@@ -140,7 +156,7 @@ export default function ChatPage() {
       const m = msg.data as DM
       setDmMessages(prev => prev.some(x => x.id === m.id) ? prev : [...prev, m])
     })
-    return () => { ch.unsubscribe() }
+    return () => { try { ch.unsubscribe() } catch { /* ignore */ } }
   }, [view, session])
 
   /* 自动滚到底部 */
