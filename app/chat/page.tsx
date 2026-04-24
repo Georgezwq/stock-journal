@@ -150,13 +150,13 @@ export default function ChatPage() {
   }
 
   return (
-    <div className="flex flex-col flex-1 h-full">
+    <div className="flex flex-col h-full overflow-hidden">
       <IndexBar indices={indices} loading={indicesLoading} onRefresh={refreshIndices} />
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* 左侧：房间列表（移动端在没选房间时显示） */}
-        <div className={`${activeRoom ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-64 border-r border-gray-200 bg-white`}>
-          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
+        <div className={`${activeRoom ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-64 border-r border-gray-200 bg-white overflow-hidden`}>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100 shrink-0">
             <h2 className="font-semibold text-gray-800">聊天室</h2>
             <button
               onClick={() => setShowCreate(true)}
@@ -199,8 +199,8 @@ export default function ChatPage() {
             )}
           </div>
 
-          {/* 用户信息 */}
-          <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2">
+          {/* 用户信息 — 移动端底部留出底部导航高度 */}
+          <div className="px-4 py-3 border-t border-gray-100 flex items-center gap-2 shrink-0 pb-[calc(0.75rem+env(safe-area-inset-bottom))] md:pb-3">
             <span className="text-xl">{(session?.user as { avatar?: string })?.avatar || '😊'}</span>
             <span className="text-sm font-medium text-gray-700 truncate flex-1">{session?.user?.name}</span>
           </div>
@@ -208,29 +208,29 @@ export default function ChatPage() {
 
         {/* 右侧：聊天区域 */}
         {activeRoom ? (
-          <div className="flex flex-col flex-1 min-w-0">
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
             {/* 顶部栏 */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white">
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-100 bg-white shrink-0">
               <button
                 onClick={() => setActiveRoom(null)}
                 className="md:hidden p-1 rounded-lg hover:bg-gray-100 text-gray-500"
               >
                 <ArrowLeft className="w-5 h-5" />
               </button>
-              <Hash className="w-4 h-4 text-gray-400" />
+              <Hash className="w-4 h-4 text-gray-400 shrink-0" />
               <div className="min-w-0">
                 <div className="font-semibold text-gray-800">{activeRoom.name}</div>
                 {activeRoom.description && (
                   <div className="text-xs text-gray-400 truncate">{activeRoom.description}</div>
                 )}
               </div>
-              <div className="ml-auto flex items-center gap-1 text-xs text-gray-400">
+              <div className="ml-auto flex items-center gap-1 text-xs text-gray-400 shrink-0">
                 <Users className="w-3.5 h-3.5" />
                 {activeRoom._count.members}
               </div>
             </div>
 
-            {/* 消息列表 */}
+            {/* 消息列表 — 可滚动区域 */}
             <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-gray-50">
               {messages.length === 0 && (
                 <div className="text-center text-gray-400 text-sm py-8">
@@ -268,8 +268,8 @@ export default function ChatPage() {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* 输入框 */}
-            <div className="px-4 py-3 bg-white border-t border-gray-100">
+            {/* 输入框 — 固定在底部，适配 iOS 安全区 + 底部导航栏 */}
+            <div className="shrink-0 px-4 pt-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-3 bg-white border-t border-gray-100">
               <div className="flex items-center gap-2">
                 <input
                   type="text"

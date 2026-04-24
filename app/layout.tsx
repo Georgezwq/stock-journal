@@ -9,6 +9,12 @@ export const metadata: Metadata = {
   description: "个人美股交易记录与复盘分析工具",
 };
 
+export const viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  viewportFit: 'cover', // iOS 安全区支持
+}
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -20,8 +26,10 @@ export default function RootLayout({
         <Providers>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
-            <main className="flex-1 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
-              {children}
+            <main className="flex-1 min-h-0 overflow-y-auto pb-16 md:pb-0" style={{ WebkitOverflowScrolling: 'touch' }}>
+              <div className="flex flex-col h-full">
+                {children}
+              </div>
             </main>
           </div>
           <Toaster position="top-right" />
