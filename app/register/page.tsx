@@ -33,10 +33,8 @@ export default function RegisterPage() {
       return
     }
 
-    // 2. 自动登录
-    await signIn('credentials', { email, password, redirect: false })
-    router.push('/')
-    router.refresh()
+    // 2. 注册成功，跳转到登录页
+    router.push('/login?registered=1')
   }
 
   return (

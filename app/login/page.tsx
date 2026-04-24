@@ -13,6 +13,9 @@ export default function LoginPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // 检测是否刚注册完
+  const registered = typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('registered') === '1'
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -74,6 +77,9 @@ export default function LoginPage() {
               </div>
             </div>
 
+          {registered && (
+              <div className="text-sm text-green-700 bg-green-50 rounded-lg px-3 py-2">🎉 注册成功！请登录</div>
+            )}
             {error && (
               <div className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{error}</div>
             )}

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/db'
 import Ably from 'ably'
 
 // 获取历史消息
 export async function GET(req: NextRequest, { params }: { params: { roomId: string } }) {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions)
   if (!session?.user) return NextResponse.json({ error: '未登录' }, { status: 401 })
 
   const messages = await prisma.message.findMany({
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { roomId: stri
 
 // 发送消息
 export async function POST(req: NextRequest, { params }: { params: { roomId: string } }) {
-  const session = await getServerSession()
+  const session = await getServerSession(authOptions)
   if (!session?.user?.id) return NextResponse.json({ error: '未登录' }, { status: 401 })
 
   const { content } = await req.json()
